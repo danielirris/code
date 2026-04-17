@@ -18,7 +18,7 @@ export default function NewStructurePage() {
     await prisma.structure.create({
       data: { name, type, description, content, notes, isActive, outputFormat }
     });
-    
+
     redirect("/structures");
   }
 
@@ -34,7 +34,7 @@ export default function NewStructurePage() {
         <Logo size={28} />
         <h1 style={{ fontSize: "1.8rem" }}>Crear nueva estructura</h1>
       </header>
-      
+
       <div className="bento-card">
         <form action={createStructure} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
@@ -63,7 +63,7 @@ export default function NewStructurePage() {
               </select>
             </div>
           </div>
-          
+
           <div>
             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
               Anatomía y reglas de estructura
@@ -71,10 +71,10 @@ export default function NewStructurePage() {
             <p style={{ fontSize: "0.8rem", color: "var(--text-tertiary)", marginBottom: "0.5rem" }}>
               Mapea las secciones y la secuencia exactas en las que Claude debe escribir este formato de entregable.
             </p>
-            <textarea 
-              name="content" 
-              className="input-base" 
-              rows={12} 
+            <textarea
+              name="content"
+              className="input-base"
+              rows={12}
               placeholder="1. Hook...&#10;2. Body...&#10;3. Offer...&#10;4. CTA..."
               required
               style={{ resize: "vertical", fontFamily: "var(--font-inter)" }}
