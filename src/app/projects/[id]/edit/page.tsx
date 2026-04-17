@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
+import { updateProject, deleteProjectById } from "@/app/actions/projects";
 
 export default async function EditProjectPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
@@ -9,26 +10,13 @@ export default async function EditProjectPage(props: { params: Promise<{ id: str
 
   if (!project) return notFound();
 
-  const experts = await prisma.expert.findMany();
+  const experts = await prisma.expert.findMany({ orderBy: { name: 'asc' } });
 
-  async function updateProject(formData: FormData) {
-    "use server";
-    const name = formData.get("name") as string;
-    const client = formData.get("client") as string;
-    const expertId = formData.get("expertId") as string;
-    const status = formData.get("status") as string;
-
-    await prisma.project.update({
-      where: { id },
-      data: { name, client, expertId, status }
-    });
-
-    redirect(`/projects/${id}`);
-  }
+  const updateProjectAction = updateProject.bind(null, id);
 
   async function deleteProject() {
     "use server";
-    await prisma.project.delete({ where: { id } });
+    await deleteProjectById(id);
     redirect("/");
   }
 
@@ -50,7 +38,7 @@ export default async function EditProjectPage(props: { params: Promise<{ id: str
       </div>
 
       <div className="bento-card" style={{ maxWidth: "800px" }}>
-        <form action={updateProject} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <form action={updateProjectAction} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>Project Name</label>

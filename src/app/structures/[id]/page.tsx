@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import Logo from "@/components/Logo";
+import { updateStructure } from "@/app/actions/structures";
 
 export default async function EditStructurePage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
@@ -12,23 +13,7 @@ export default async function EditStructurePage(props: { params: Promise<{ id: s
     return notFound();
   }
 
-  async function updateStructure(formData: FormData) {
-    "use server";
-    const name = formData.get("name") as string;
-    const type = formData.get("type") as string;
-    const description = formData.get("description") as string;
-    const content = formData.get("content") as string;
-    const notes = formData.get("notes") as string;
-    const isActive = formData.get("isActive") === "on";
-    const outputFormat = formData.get("outputFormat") as string;
-
-    await prisma.structure.update({
-      where: { id },
-      data: { name, type, description, content, notes, isActive, outputFormat }
-    });
-    
-    redirect("/structures");
-  }
+  const updateStructureAction = updateStructure.bind(null, id);
 
   return (
     <div className="container" style={{ paddingTop: "2rem", paddingBottom: "4rem" }}>
@@ -44,7 +29,7 @@ export default async function EditStructurePage(props: { params: Promise<{ id: s
       </header>
       
       <div className="bento-card">
-        <form action={updateStructure} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <form action={updateStructureAction} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>Nombre de la estructura</label>

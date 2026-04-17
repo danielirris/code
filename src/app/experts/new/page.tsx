@@ -1,23 +1,8 @@
-import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { createExpert } from "@/app/actions/experts";
 
 export default function NewExpertPage() {
-
-  async function createExpert(formData: FormData) {
-    "use server";
-    const name = formData.get("name") as string;
-    const specialty = formData.get("specialty") as string;
-    const instructions = formData.get("instructions") as string;
-    
-    const expert = await prisma.expert.create({
-      data: { name, specialty, instructions }
-    });
-    
-    redirect(`/experts/${expert.id}`);
-  }
-
   return (
     <div className="container" style={{ paddingTop: "2rem", paddingBottom: "4rem" }}>
       <div style={{ marginBottom: "2rem" }}>
@@ -27,7 +12,7 @@ export default function NewExpertPage() {
       </div>
 
       <h1 style={{ fontSize: "1.8rem", marginBottom: "1.5rem" }}>Crear nuevo experto</h1>
-      
+
       <div className="bento-card">
         <form action={createExpert} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
@@ -40,7 +25,7 @@ export default function NewExpertPage() {
               <input type="text" name="specialty" className="input-base" placeholder="ej. Emails de venta" required />
             </div>
           </div>
-          
+
           <div>
             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>
               Instrucciones maestras (núcleo del prompt)
@@ -49,10 +34,10 @@ export default function NewExpertPage() {
               Enseña a este experto CÓMO escribir. Incluye frameworks, reglas de tono, qué evitar y plantillas estructurales.
               (Nota: Las reglas de Breakthrough Advertising y Hormozi ya se aplican globalmente por defecto).
             </p>
-            <textarea 
-              name="instructions" 
-              className="input-base" 
-              rows={15} 
+            <textarea
+              name="instructions"
+              className="input-base"
+              rows={15}
               placeholder="1. Siempre empieza con un gancho que apunte al dolor principal del lector...&#10;2. Usa párrafos cortos y directos...&#10;3. Aplica el framework PAS en la transición..."
               required
               style={{ resize: "vertical", fontFamily: "var(--font-inter)" }}

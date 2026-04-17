@@ -1,27 +1,9 @@
-import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import Logo from "@/components/Logo";
+import { createStructure } from "@/app/actions/structures";
 
 export default function NewStructurePage() {
-  async function createStructure(formData: FormData) {
-    "use server";
-    const name = formData.get("name") as string;
-    const type = formData.get("type") as string;
-    const description = formData.get("description") as string;
-    const content = formData.get("content") as string;
-    const notes = formData.get("notes") as string;
-    const isActive = formData.get("isActive") === "on";
-    const outputFormat = formData.get("outputFormat") as string;
-
-    await prisma.structure.create({
-      data: { name, type, description, content, notes, isActive, outputFormat }
-    });
-
-    redirect("/structures");
-  }
-
   return (
     <div className="container" style={{ paddingTop: "2rem", paddingBottom: "4rem" }}>
       <div style={{ marginBottom: "2rem" }}>

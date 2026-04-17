@@ -1,27 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { createProject } from "@/app/actions/projects";
 
 export default async function NewProjectPage() {
   const experts = await prisma.expert.findMany({
     orderBy: { name: 'asc' }
   });
-
-  async function createProject(formData: FormData) {
-    "use server";
-    const name = formData.get("name") as string;
-    const client = formData.get("client") as string;
-    const expertId = formData.get("expertId") as string;
-    
-    if (!expertId) throw new Error("El experto es obligatorio");
-
-    const project = await prisma.project.create({
-      data: { name, client, expertId, status: "active" }
-    });
-    
-    redirect(`/projects/${project.id}?tab=knowledge`);
-  }
 
   return (
     <div className="container" style={{ paddingTop: "2rem", paddingBottom: "4rem" }}>
@@ -32,14 +17,14 @@ export default async function NewProjectPage() {
       </div>
 
       <h1 style={{ fontSize: "1.8rem", marginBottom: "1.5rem" }}>Crear nuevo proyecto</h1>
-      
+
       <div className="bento-card" style={{ maxWidth: "600px" }}>
         <form action={createProject} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div>
             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>Nombre del proyecto</label>
             <input type="text" name="name" className="input-base" placeholder="ej. Secuencia de lanzamiento Q3" required />
           </div>
-          
+
           <div>
             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>Cliente / Marca (opcional)</label>
             <input type="text" name="client" className="input-base" placeholder="ej. Acme Corp" />

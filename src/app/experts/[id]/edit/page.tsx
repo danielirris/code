@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { updateExpert } from "@/app/actions/experts";
 
 export default async function EditExpertPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
@@ -18,19 +18,7 @@ export default async function EditExpertPage(props: { params: Promise<{ id: stri
     );
   }
 
-  async function updateExpert(formData: FormData) {
-    "use server";
-    const name = formData.get("name") as string;
-    const specialty = formData.get("specialty") as string;
-    const instructions = formData.get("instructions") as string;
-    
-    await prisma.expert.update({
-      where: { id },
-      data: { name, specialty, instructions }
-    });
-    
-    redirect(`/experts/${id}`);
-  }
+  const updateExpertAction = updateExpert.bind(null, id);
 
   return (
     <div className="container" style={{ paddingTop: "2rem", paddingBottom: "4rem" }}>
@@ -43,9 +31,9 @@ export default async function EditExpertPage(props: { params: Promise<{ id: stri
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <h1 style={{ fontSize: "1.8rem" }}>Editar experto</h1>
       </div>
-      
+
       <div className="bento-card">
-        <form action={updateExpert} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <form action={updateExpertAction} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
             <div>
               <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 500 }}>Nombre del experto</label>
