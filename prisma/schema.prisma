@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Setting {
+  id              String  @id @default(cuid())
+  anthropicApiKey String?
+  selectedModel   String  @default("claude-3-7-sonnet-20250219")
+}
+
+model Structure {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  description String?
+  content     String
+  notes       String?
+  isActive    Boolean  @default(true)
+  outputFormat String  @default("PLAIN") // PLAIN, MARKDOWN, HTML
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Expert {
+  id           String      @id @default(cuid())
+  name         String
+  specialty    String
+  instructions String
+  references   String?
+  vocProfile   String?     // VoC Profile Text/Markdown
+  projects     Project[]
+  knowledge    Knowledge[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  expertId     String
+  expert       Expert        @relation(fields: [expertId], references: [id])
+  client       String?
+  status       String        @default("active") // active, archived, completed
+  notes        String?
+  vocProfile   String?       // Override VoC Profile Text/Markdown
+  knowledge    Knowledge[]
+  deliverables Deliverable[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Knowledge {
+  id         String   @id @default(cuid())
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  expertId   String?
+  expert     Expert?  @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  title      String
+  type       String   // TEXT, FILE, URL
+  rawContent String
+  tags       String?
+  createdAt  DateTime @default(now())
+}
+
+model Deliverable {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type      String
+  brief     String
+  content   String
+  createdAt DateTime @default(now())
+}
