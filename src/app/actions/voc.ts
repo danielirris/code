@@ -1,19 +1,13 @@
 "use server";
 import { prisma } from "@/lib/prisma";
-import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
-import { loadSettings } from "@/lib/settings";
-import {
-  DEFAULT_VOC_MODEL_ID,
-  isDeprecatedModelError,
-  DEPRECATED_MODEL_USER_MESSAGE,
-} from "@/config/models";
+import { loadSettings, getProviderKeys } from "@/lib/settings";
+import { getModelFromRegistry } from "@/lib/modelRegistry";
+import { DEFAULT_VOC_MODEL_ID } from "@/config/models";
+import { generateCopy, ProviderError } from "@/lib/providers";
 
 export async function generateVocProfile(id: string, type: 'expert' | 'project') {
-  const { settings } = await loadSettings();
-  if (!settings?.anthropicApiKey) throw new Error("API Key not configured");
-
-  const anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
+  const [{ settings }, keys] = await Promise.all([loadSettings(), getProviderKeys()]);
 
   const knowledgeList = await prisma.knowledge.findMany({
     where: type === 'expert' ? { expertId: id } : { projectId: id }
@@ -23,9 +17,16 @@ export async function generateVocProfile(id: string, type: 'expert' | 'project')
     throw new Error("No hay conocimiento base para analizar.");
   }
 
+  const modelId = settings?.selectedModel || DEFAULT_VOC_MODEL_ID;
+  const model = await getModelFromRegistry(modelId);
+  if (!model) throw new Error(`Modelo ${modelId} no encontrado. Revisa Configuración.`);
+  if (!keys[model.provider]) {
+    throw new Error(`Configura tu API key de ${model.provider} en Configuración para generar VoC.`);
+  }
+
   const rawTexts = knowledgeList.map(k => `[${k.title}]\n${k.rawContent}`).join("\n\n---\n\n");
 
-  const prompt = `Eres un investigador de mercado experto en Voice of Customer (VoC). 
+  const prompt = `Eres un investigador de mercado experto en Voice of Customer (VoC).
 Analiza detalladamente la siguiente raw data importada y devuelve un "Voice of Customer Profile" estructurado en Markdown.
 
 Debes incluir OBLIGATORIAMENTE estas secciones:
@@ -63,35 +64,33 @@ ${rawTexts}
 
   let response;
   try {
-    response = await anthropic.messages.create({
-      model: settings.selectedModel || DEFAULT_VOC_MODEL_ID,
-      max_tokens: 3000,
-      messages: [
-        { role: "user", content: prompt }
-      ]
-    });
+    response = await generateCopy(
+      {
+        provider: model.provider,
+        model: model.id,
+        systemPrompt: "You are a customer research analyst. Respond only in Markdown.",
+        userPrompt: prompt,
+        maxTokens: 3000,
+      },
+      keys
+    );
   } catch (err) {
-    if (isDeprecatedModelError(err)) {
-      throw new Error(DEPRECATED_MODEL_USER_MESSAGE);
+    if (err instanceof ProviderError) {
+      throw new Error(err.userMessage);
     }
     throw err;
-  }
-
-  let contentText = "";
-  if (response.content[0].type === "text") {
-     contentText = response.content[0].text;
   }
 
   if (type === 'expert') {
     await prisma.expert.update({
       where: { id },
-      data: { vocProfile: contentText }
+      data: { vocProfile: response.content }
     });
     revalidatePath(`/experts/${id}`);
   } else {
     await prisma.project.update({
       where: { id },
-      data: { vocProfile: contentText }
+      data: { vocProfile: response.content }
     });
     revalidatePath(`/projects/${id}`);
   }

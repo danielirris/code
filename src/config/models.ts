@@ -20,6 +20,7 @@ export type Model = {
 };
 
 export const BUILT_IN_MODELS: Model[] = [
+  // Anthropic
   {
     id: "claude-opus-4-7",
     provider: "anthropic",
@@ -56,6 +57,83 @@ export const BUILT_IN_MODELS: Model[] = [
     tier: "fast",
     bestFor: ["Variantes rápidas", "Tareas simples"],
   },
+  // Google — Pro: precio sube a $4/$18 por 1M si input > 200k tokens
+  {
+    id: "gemini-3.1-pro",
+    provider: "google",
+    displayName: "Gemini 3.1 Pro",
+    pricing: {
+      input: 2.0,
+      output: 12.0,
+      inputLongContext: 4.0,
+      outputLongContext: 18.0,
+      longContextThreshold: 200_000,
+    },
+    maxContext: 1_000_000,
+    tier: "premium",
+    bestFor: ["Procesamiento de contextos enormes", "Análisis"],
+  },
+  {
+    id: "gemini-3-pro",
+    provider: "google",
+    displayName: "Gemini 3 Pro",
+    pricing: {
+      input: 2.0,
+      output: 12.0,
+      inputLongContext: 4.0,
+      outputLongContext: 18.0,
+      longContextThreshold: 200_000,
+    },
+    maxContext: 1_000_000,
+    tier: "premium",
+    bestFor: ["Contextos grandes", "Análisis"],
+  },
+  {
+    id: "gemini-3-flash",
+    provider: "google",
+    displayName: "Gemini 3 Flash",
+    pricing: { input: 0.5, output: 3.0 },
+    maxContext: 1_000_000,
+    tier: "balanced",
+    bestFor: ["Voice of Customer", "Procesamiento de archivos largos"],
+  },
+  {
+    id: "gemini-3.1-flash-lite",
+    provider: "google",
+    displayName: "Gemini 3.1 Flash-Lite",
+    pricing: { input: 0.25, output: 1.5 },
+    maxContext: 1_000_000,
+    tier: "fast",
+    bestFor: ["Variantes masivas", "Tareas rápidas"],
+  },
+  {
+    id: "gemini-2.5-flash",
+    provider: "google",
+    displayName: "Gemini 2.5 Flash",
+    pricing: { input: 0.3, output: 2.5 },
+    maxContext: 1_000_000,
+    tier: "fast",
+    bestFor: ["Tareas rápidas"],
+  },
+  // OpenAI
+  {
+    id: "gpt-4o",
+    provider: "openai",
+    displayName: "GPT-4o",
+    pricing: { input: 2.5, output: 10.0 },
+    maxContext: 128_000,
+    tier: "balanced",
+    bestFor: ["Copy general"],
+  },
+  {
+    id: "gpt-4o-mini",
+    provider: "openai",
+    displayName: "GPT-4o Mini",
+    pricing: { input: 0.15, output: 0.6 },
+    maxContext: 128_000,
+    tier: "fast",
+    bestFor: ["Variantes rápidas", "Tareas simples"],
+  },
 ];
 
 export const DEFAULT_MODEL_ID = "claude-sonnet-4-6";
@@ -63,11 +141,38 @@ export const DEFAULT_VOC_MODEL_ID = "claude-sonnet-4-6";
 export const DEFAULT_LONG_FORM_MODEL_ID = "claude-opus-4-7";
 export const DEFAULT_FAST_MODEL_ID = "claude-haiku-4-5-20251001";
 
-export function getAllModels(): Model[] {
+export const PROVIDER_META: Record<Provider, { label: string; color: string; consoleUrl: string; keyLabel: string }> = {
+  anthropic: {
+    label: "Anthropic (Claude)",
+    color: "#a855f7",
+    consoleUrl: "https://console.anthropic.com/settings/keys",
+    keyLabel: "Obtener API key en console.anthropic.com",
+  },
+  google: {
+    label: "Google (Gemini)",
+    color: "#3b82f6",
+    consoleUrl: "https://aistudio.google.com/apikey",
+    keyLabel: "Obtener API key en aistudio.google.com/apikey",
+  },
+  openai: {
+    label: "OpenAI (GPT)",
+    color: "#10b981",
+    consoleUrl: "https://platform.openai.com/api-keys",
+    keyLabel: "Obtener API key en platform.openai.com/api-keys",
+  },
+};
+
+export const TIER_META: Record<Tier, { label: string; dot: string }> = {
+  premium: { label: "Premium", dot: "🔴" },
+  balanced: { label: "Balanced", dot: "🟡" },
+  fast: { label: "Fast", dot: "🟢" },
+};
+
+export function getAllBuiltInModels(): Model[] {
   return BUILT_IN_MODELS;
 }
 
-export function getModelById(id: string): Model | undefined {
+export function getBuiltInModelById(id: string): Model | undefined {
   return BUILT_IN_MODELS.find((m) => m.id === id);
 }
 
@@ -94,3 +199,26 @@ export function isDeprecatedModelError(err: unknown): boolean {
 
 export const DEPRECATED_MODEL_USER_MESSAGE =
   "El modelo configurado ya no está disponible. Ve a Configuración → Proveedores para seleccionar uno activo.";
+
+export function calculateCost(
+  pricing: ModelPricing,
+  inputTokens: number,
+  outputTokens: number
+): number {
+  const threshold = pricing.longContextThreshold ?? Infinity;
+  const useLong = inputTokens > threshold;
+  const inRate = useLong ? pricing.inputLongContext ?? pricing.input : pricing.input;
+  const outRate = useLong ? pricing.outputLongContext ?? pricing.output : pricing.output;
+  return (inputTokens / 1_000_000) * inRate + (outputTokens / 1_000_000) * outRate;
+}
+
+export function roughTokenCount(text: string): number {
+  if (!text) return 0;
+  return Math.ceil(text.length / 4);
+}
+
+// Keep legacy aliases for callers that still import them.
+export const getModelById = getBuiltInModelById;
+export function getAllModels(): Model[] {
+  return BUILT_IN_MODELS;
+}

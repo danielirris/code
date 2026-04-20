@@ -7,6 +7,9 @@ import GeneratorUI from "./GeneratorUI";
 import VocManager from "@/components/VocManager";
 import RegenerateBtn from "@/components/RegenerateBtn";
 import FileUploadForm from "./FileUploadForm";
+import { getAllAvailableModels } from "@/lib/modelRegistry";
+import { loadSettings } from "@/lib/settings";
+import { roughTokenCount, DEFAULT_MODEL_ID } from "@/config/models";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -18,7 +21,7 @@ export default async function ProjectViewPage(props: Props) {
   const tab = (searchParams.tab as string) || "knowledge";
   const { id } = params;
 
-  const [project, activeStructures] = await Promise.all([
+  const [project, activeStructures, availableModels, { settings }] = await Promise.all([
     prisma.project.findUnique({
       where: { id },
       include: {
@@ -31,10 +34,26 @@ export default async function ProjectViewPage(props: Props) {
       where: { isActive: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, type: true, description: true, content: true, notes: true, outputFormat: true }
-    })
+    }),
+    getAllAvailableModels(),
+    loadSettings(),
   ]);
 
   if (!project) return notFound();
+
+  const baseContextTokens = roughTokenCount(
+    (project.expert.instructions || "") +
+    (project.vocProfile || project.expert.vocProfile || "") +
+    project.knowledge.map((k) => k.rawContent).join("")
+  );
+
+  const providerKeysAvailable = {
+    anthropic: !!settings?.anthropicApiKey,
+    google: !!settings?.googleApiKey,
+    openai: !!settings?.openaiApiKey,
+  };
+
+  const defaultModelId = settings?.selectedModel || DEFAULT_MODEL_ID;
 
   return (
     <div className="container" style={{ paddingTop: "2rem", paddingBottom: "4rem" }}>
@@ -164,7 +183,15 @@ export default async function ProjectViewPage(props: Props) {
 
       {/* Tab Content: Generate */}
       {tab === "generate" && (
-        <GeneratorUI projectId={id} expertSpecialty={project.expert.specialty} structures={activeStructures} />
+        <GeneratorUI
+          projectId={id}
+          expertSpecialty={project.expert.specialty}
+          structures={activeStructures}
+          availableModels={availableModels}
+          providerKeysAvailable={providerKeysAvailable}
+          defaultModelId={defaultModelId}
+          baseContextTokens={baseContextTokens}
+        />
       )}
 
       {/* Tab Content: VoC */}
