@@ -10,7 +10,7 @@ datasource db {
 model Setting {
   id              String  @id @default(cuid())
   anthropicApiKey String?
-  selectedModel   String  @default("claude-3-7-sonnet-20250219")
+  selectedModel   String  @default("claude-sonnet-4-6")
 }
 
 model Structure {

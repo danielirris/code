@@ -18,14 +18,21 @@ export default async function ProjectViewPage(props: Props) {
   const tab = (searchParams.tab as string) || "knowledge";
   const { id } = params;
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: {
-      expert: true,
-      knowledge: { orderBy: { createdAt: "desc" } },
-      deliverables: { orderBy: { createdAt: "desc" } }
-    }
-  });
+  const [project, activeStructures] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id },
+      include: {
+        expert: true,
+        knowledge: { orderBy: { createdAt: "desc" } },
+        deliverables: { orderBy: { createdAt: "desc" } }
+      }
+    }),
+    prisma.structure.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, type: true, description: true, content: true, notes: true, outputFormat: true }
+    })
+  ]);
 
   if (!project) return notFound();
 
@@ -157,7 +164,7 @@ export default async function ProjectViewPage(props: Props) {
 
       {/* Tab Content: Generate */}
       {tab === "generate" && (
-        <GeneratorUI projectId={id} expertSpecialty={project.expert.specialty} />
+        <GeneratorUI projectId={id} expertSpecialty={project.expert.specialty} structures={activeStructures} />
       )}
 
       {/* Tab Content: VoC */}

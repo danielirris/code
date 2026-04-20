@@ -2,13 +2,19 @@
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
+import { loadSettings } from "@/lib/settings";
+import {
+  DEFAULT_VOC_MODEL_ID,
+  isDeprecatedModelError,
+  DEPRECATED_MODEL_USER_MESSAGE,
+} from "@/config/models";
 
 export async function generateVocProfile(id: string, type: 'expert' | 'project') {
-  const settings = await prisma.setting.findFirst();
+  const { settings } = await loadSettings();
   if (!settings?.anthropicApiKey) throw new Error("API Key not configured");
 
   const anthropic = new Anthropic({ apiKey: settings.anthropicApiKey });
-  
+
   const knowledgeList = await prisma.knowledge.findMany({
     where: type === 'expert' ? { expertId: id } : { projectId: id }
   });
@@ -55,13 +61,21 @@ DATA RAW PARA ANALIZAR:
 ${rawTexts}
 =========================`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-3-7-sonnet-20250219",
-    max_tokens: 3000,
-    messages: [
-      { role: "user", content: prompt }
-    ]
-  });
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: settings.selectedModel || DEFAULT_VOC_MODEL_ID,
+      max_tokens: 3000,
+      messages: [
+        { role: "user", content: prompt }
+      ]
+    });
+  } catch (err) {
+    if (isDeprecatedModelError(err)) {
+      throw new Error(DEPRECATED_MODEL_USER_MESSAGE);
+    }
+    throw err;
+  }
 
   let contentText = "";
   if (response.content[0].type === "text") {

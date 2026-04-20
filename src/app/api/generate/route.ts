@@ -1,24 +1,49 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { loadSettings } from "@/lib/settings";
+import {
+  DEFAULT_MODEL_ID,
+  isDeprecatedModelError,
+  DEPRECATED_MODEL_USER_MESSAGE,
+} from "@/config/models";
 
 export async function POST(req: Request) {
   try {
-    const { projectId, type, brief } = await req.json();
-    
-    if (!projectId || !type || !brief) {
+    const body = await req.json();
+    const { projectId, structureId, type: typeInput, brief } = body as {
+      projectId?: string;
+      structureId?: string;
+      type?: string;
+      brief?: string;
+    };
+
+    if (!projectId || !brief || (!structureId && !typeInput)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: { expert: true, knowledge: true }
-    });
-    
-    const settings = await prisma.setting.findFirst();
-    
+    const [project, template, { settings }] = await Promise.all([
+      prisma.project.findUnique({
+        where: { id: projectId },
+        include: { expert: true, knowledge: true }
+      }),
+      structureId
+        ? prisma.structure.findUnique({ where: { id: structureId } })
+        : prisma.structure.findFirst({ where: { type: typeInput!, isActive: true } }),
+      loadSettings(),
+    ]);
+
     if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
     if (!settings?.anthropicApiKey) return NextResponse.json({ error: "API Key not configured in Settings" }, { status: 400 });
+
+    if (structureId && (!template || !template.isActive)) {
+      return NextResponse.json(
+        { error: "La estructura seleccionada ya no está disponible. Elige otra en el dropdown." },
+        { status: 400 }
+      );
+    }
+
+    const type = template?.type || typeInput || "Entregable";
 
     const anthropic = new Anthropic({
       apiKey: settings.anthropicApiKey,
@@ -26,7 +51,7 @@ export async function POST(req: Request) {
 
     // Prompt Assembler
     const systemPromptBase = "Eres un copywriter senior que opera bajo los frameworks de Breakthrough Advertising (Schwartz) y $100M Offers/Leads (Hormozi). Antes de escribir identificas nivel de consciencia, nivel de sofisticación, y estructuras la oferta según la value equation. Nunca escribes copy genérico.";
-    
+
     let knowledgeStr = "";
     if (project.knowledge.length > 0) {
       knowledgeStr = project.knowledge.map((k) => `[TIPO: ${k.type} | TITULO: ${k.title}]\n${k.rawContent}`).join("\n\n---\n\n");
@@ -34,15 +59,11 @@ export async function POST(req: Request) {
       knowledgeStr = "No hay contexto de conocimiento adicional suministrado por el usuario.";
     }
 
-    const template = await prisma.structure.findFirst({
-      where: { type, isActive: true },
-    });
-
-    let structureStr = template 
+    const structureStr = template
       ? `2. ESTRUCTURA GLOBAL DEL ENTREGABLE (${template.name}):
 Implementa estrictamente la siguiente anatomía:
 ${template.content}
-Notas extra: ${template.notes || 'Ninguna'}` 
+Notas / ejemplo: ${template.notes || 'Ninguna'}`
       : "2. ESTRUCTURA LIBRE (No hay template global para este tipo. Decide tú la mejor anatomía.)";
 
     const vocStr = project.vocProfile || project.expert.vocProfile || "No hay Voice of Customer definido explícitamente. Asume lo mejor según el framework.";
@@ -72,14 +93,22 @@ ${template?.outputFormat === "HTML" ? "⚠️ CRÍTICO: El resultado DEBE ser de
 
 Sin explicaciones, sin preámbulos, sin meta-comentarios.`;
 
-    const response = await anthropic.messages.create({
-      model: settings?.selectedModel || "claude-3-7-sonnet-20250219",
-      max_tokens: 8192,
-      system: systemPromptBase,
-      messages: [
-        { role: "user", content: fullPrompt }
-      ]
-    });
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model: settings?.selectedModel || DEFAULT_MODEL_ID,
+        max_tokens: 8192,
+        system: systemPromptBase,
+        messages: [
+          { role: "user", content: fullPrompt }
+        ]
+      });
+    } catch (err) {
+      if (isDeprecatedModelError(err)) {
+        return NextResponse.json({ error: DEPRECATED_MODEL_USER_MESSAGE }, { status: 400 });
+      }
+      throw err;
+    }
 
     let contentText = "";
     if (response.content[0].type === "text") {
@@ -88,7 +117,6 @@ Sin explicaciones, sin preámbulos, sin meta-comentarios.`;
        contentText = "Unrecognized response type from Claude.";
     }
 
-    // Persist Generation
     const deliverable = await prisma.deliverable.create({
       data: {
         projectId,
